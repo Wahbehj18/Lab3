@@ -47,9 +47,17 @@ void groupSummary(int gIndex){
 		gd.bg_inode_table);
 }
 
-void freeBlockSummary(int blockIndex){
-	char freeBlock[blockSize];
-	pread(fd, &freeBlock, blockSize, blockSize*blockIndex);
+void bitMapSummary(int blockIndex){
+	char bitMap[blockSize];
+	pread(fd, &bitMap, blockSize, blockSize*blockIndex);
+
+	for(int i = 0; i < blockSize; i++){
+		for(int j = 0; j < 8; j++){
+			if(((bitMap[i] >> j) & 1) == 0){
+				fprintf(stdout, "BFREE,%d\n", i*8+j);
+			}
+		}
+	}
 }
 
 int main(int argc, char* argv[]){
@@ -67,6 +75,6 @@ int main(int argc, char* argv[]){
 	
 	for(int i; i < numGroups; i++){
 		groupSummary(i);
-		freeBlockSummary(gd.bg_block_bitmap);
+		bitMapSummary(gd.bg_block_bitmap);
 	}
 }
