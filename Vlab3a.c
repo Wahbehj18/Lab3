@@ -47,11 +47,40 @@ void groupSummary(int gIndex){
 		gd.bg_inode_table);
 }
 
-void freeBlockSummary(int blockIndex){
-	char freeBlock[blockSize];
-	pread(fd, &freeBlock, blockSize, blockSize*blockIndex);
+void bitMapSummary(int blockIndex){
+	char bitMap[blockSize];
+	pread(fd, &bitMap, blockSize, blockSize*blockIndex);
+
+	for(int i = 0; i < blockSize; i++){
+		for(int j = 0; j < 8; j++){
+			if(((bitMap[i] >> j) & 1) == 0){
+				fprintf(stdout, "BFREE,%d\n", i*8+j);
+			}
+		}
+	}
 }
 
+void InodeBitMapSummary(int index)
+{
+  char IBitMap[blockSize];
+  int numBytes = superblock.s_indoes_per_group / 8;
+  //int off = 1024 + (j - 1) * blockSize;
+  unsigned int follow = index * superblock.s_indoes_per_group + 1; 
+  pread(fd, &IBitMap, numBytes, blockSize*index);
+
+  for(int i = 0; i < numBytes; i++)
+    {
+      for(int j = 0; j < 8; j++)
+	{
+	  if(((IBitMap[i]  >> j) & 1) == 0)
+	    {
+	      fprintf(stdout, "IFREE,%d\n",follow); 
+	    }
+		follow++;
+	}    
+      
+    }
+}
 int main(int argc, char* argv[]){
 
 	blockSize = EXT2_MIN_BLOCK_SIZE << super.s_log_block_size;
@@ -67,6 +96,6 @@ int main(int argc, char* argv[]){
 	
 	for(int i; i < numGroups; i++){
 		groupSummary(i);
-		freeBlockSummary(gd.bg_block_bitmap);
+		bitMapSummary(gd.bg_block_bitmap);
 	}
 }
