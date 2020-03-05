@@ -18,13 +18,13 @@ int numGroups;
 long bytesPerGroup;
 
 
-void timeGetter(char* buff, time_t curr)
+char* timeGetter(time_t curr)
 {
- 
+  char* buff = malloc(sizeof(char)*32);
   time_t rawtime = curr;
   struct tm* raw = gmtime(&rawtime);
-  strftime(buff, 32, "%m/%d/%y %H:%M:%S", &raw);
-  
+  strftime(buff, 32, "%m/%d/%y %H:%M:%S", raw);
+  return buff;
 }
 
 void superSummary(){
@@ -88,15 +88,20 @@ void InodeSummary(int blockNum)
 	    fileType = 'd';
 	  else if(inodeTable[i].i_mode & S_IFLNK)
 	    fileType = 's';
-	  char aTime[32];
-	  char mtime[32];
-	  char ctime[32];
-	  timeGetter(aTime, inodeTable[i].i_atime);
-	  timeGetter(mTime, inodeTable[i].i_mtime);
-	  timeGetter(ctime, inodeTable[i].i_ctime);
+	  char* aTime;
+	  char* mTime;
+	  char* cTime;
+	  aTime = timeGetter( inodeTable[i].i_atime);
+	  mTime = timeGetter(inodeTable[i].i_mtime);
+	  cTime = timeGetter( inodeTable[i].i_ctime);
 	  
-	  fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%d,%d,%d,%d,%d\n",i, 
-		  fileType, inodeTable[i].i_mode & 0xFFF, inodeTable[i].i_uid, inodeTable[i].i_gid, inodeTable[i].i_links_count, 
+	  fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d",i,fileType, inodeTable[i].i_mode & 0xFFF, inodeTable[i].i_uid, inodeTable[i].i_gid, inodeTable[i].i_links_count, cTime, mTime, aTime, inodeTable[i].i_size, inodeTable[i].i_blocks);
+	  int j = 0;
+	  for (j = 0; j < 15; j++)
+	    {
+	      fprintf(stdout, ",%u", inodeTable[i].i_block[j]);
+	    }
+	  fprintf(stdout, "\n");
 	}
     }
 }
