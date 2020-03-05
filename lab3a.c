@@ -81,6 +81,28 @@ void InodeBitMapSummary(int index)
       
     }
 }
+
+void dirSummary(int inodeNum, struct ext2_inode *inode){
+
+	struct ext2_dir_entry dir;
+	int offset;
+	int logicalOffset = 0;
+	for(int i = 0; i < 12; i++){
+		if(inode->i_block[i] != 0){
+			while(logicalOffset < blockSize){
+				offset = inode->i_block[i]*blockSize + logicalOffset;
+				pread(fd, &dir, sizeof(dir), offset);
+				if(dir.inode != 0){
+					fprintf(stdout,"DIRENT,%d,%d,%d,%d,%d,%s\n",
+					inodeNum, logicalOffset, dir.inode, dir.rec_len, 
+					dir.name_len, dir.name);
+				}
+				logicalOffset += dir.rec_len;
+			}
+		}
+	}
+}
+
 int main(int argc, char* argv[]){
 
 	blockSize = EXT2_MIN_BLOCK_SIZE << super.s_log_block_size;
