@@ -1,0 +1,8 @@
+NAME: Valentin Lagunes,Jacob Wahbeh
+EMAIL: valentinlagunes51@gmail.com,wahbehj18@g.ucla.edu
+ID: 505117243,105114897
+
+We included the lab3a output file, the lab3a.c file,
+this README, and the tarball. We also included the
+Makefile itself which includes the three requested
+targets: clean, dist, and a default build.
