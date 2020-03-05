@@ -91,6 +91,25 @@ void dirSummary(int inodeNum, struct ext2_inode *inode){
 	}
 }
 
+void indirectSummary(int blockIndex, int level, int inodeNum, int offset){
+
+	int indirPtrs[blockSize];
+	int numPtrs = blockSize/4;
+
+	pread(fd, &indirPtrs, sizeof(indirPtrs), blockIndex*blockSize);
+
+	for(int i = 0; i < numPtrs; i++){
+		if(indirPtrs[i] != 0){
+			fprintf(stdout, "INDIRECT,%d,%d,%d,%d,%d\n",
+			 inodeNum, level, offset, blockIndex, indirPtrs[i]);
+			if(level == 2 || level == 3)
+				indirectSummary(indirPtrs[i], level-1, inodeNum, offset);
+			offset += pow(256,level-1);
+		}
+	}
+
+}
+
 void InodeSummary(int blockNum)
 {
 
@@ -127,6 +146,13 @@ void InodeSummary(int blockNum)
 
 		  if(fileType == 'd')
     		dirSummary(iNum+i, &inodeTable[i]);
+
+    	  if(inodeTable[i].i_block[12] != 0)
+    	  	indirectSummary(inodeTable[i].i_block[12], 1, iNum + i, 12);
+    	  if(inodeTable[i].i_block[13] != 0)
+    	  	indirectSummary(inodeTable[i].i_block[13], 2, iNum + i, 256+12);
+    	  if(inodeTable[i].i_block[14] != 0)
+    	  	indirectSummary(inodeTable[i].i_block[14], 3, iNum + i, 256*256+256+12);
 		}
     }
 
