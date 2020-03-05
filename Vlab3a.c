@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <math.h>
 #include "ext2_fs.h"
+#include <time.h>
+#include <sys/types.h>
 
 struct ext2_super_block super;
 struct ext2_group_desc gd;
@@ -15,6 +17,15 @@ int blockSize;
 int numGroups;
 long bytesPerGroup;
 
+
+char* timeGetter(time_t curr)
+{
+  char* buff = malloc(sizeof(char)*32);
+  time_t rawtime = curr;
+  struct tm* raw = gmtime(&rawtime);
+  strftime(buff, 32, "%m/%d/%y %H:%M:%S", raw);
+  return buff;
+}
 
 void superSummary(){
 	pread(fd, &super, sizeof(super), blockSize);
@@ -60,12 +71,47 @@ void bitMapSummary(int blockIndex){
 	}
 }
 
+void InodeSummary(int blockNum)
+{
+  int InodeTableSize = super.s_inodes_per_group;
+  struct ext2_inode inodeTable[super.s_inodes_per_group];
+  pread(fd, &inodeTable , sizeof(inodeTable) , blockSize * blockNum);
+  char fileType = '?';
+  int i = 0;
+  for(i = 0; i < InodeTableSize; i++)
+    {
+      if(inodeTable[i].i_mode != 0 && inodeTable[i].i_links_count != 0)
+	{
+	  if(inodeTable[i].i_mode & S_IFREG)
+	    fileType = 'f';
+	  else if(inodeTable[i].i_mode & S_IFDIR)
+	    fileType = 'd';
+	  else if(inodeTable[i].i_mode & S_IFLNK)
+	    fileType = 's';
+	  char* aTime;
+	  char* mTime;
+	  char* cTime;
+	  aTime = timeGetter( inodeTable[i].i_atime);
+	  mTime = timeGetter(inodeTable[i].i_mtime);
+	  cTime = timeGetter( inodeTable[i].i_ctime);
+	  
+	  fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d",i,fileType, inodeTable[i].i_mode & 0xFFF, inodeTable[i].i_uid, inodeTable[i].i_gid, inodeTable[i].i_links_count, cTime, mTime, aTime, inodeTable[i].i_size, inodeTable[i].i_blocks);
+	  int j = 0;
+	  for (j = 0; j < 15; j++)
+	    {
+	      fprintf(stdout, ",%u", inodeTable[i].i_block[j]);
+	    }
+	  fprintf(stdout, "\n");
+	}
+    }
+}
+
 void InodeBitMapSummary(int index)
 {
   char IBitMap[blockSize];
-  int numBytes = superblock.s_indoes_per_group / 8;
+  int numBytes = super.s_inodes_per_group / 8;
   //int off = 1024 + (j - 1) * blockSize;
-  unsigned int follow = index * superblock.s_indoes_per_group + 1; 
+  unsigned int follow = index * super.s_inodes_per_group + 1; 
   pread(fd, &IBitMap, numBytes, blockSize*index);
 
   for(int i = 0; i < numBytes; i++)
@@ -76,6 +122,7 @@ void InodeBitMapSummary(int index)
 	    {
 	      fprintf(stdout, "IFREE,%d\n",follow); 
 	    }
+	  
 		follow++;
 	}    
       
@@ -97,5 +144,7 @@ int main(int argc, char* argv[]){
 	for(int i; i < numGroups; i++){
 		groupSummary(i);
 		bitMapSummary(gd.bg_block_bitmap);
+		InodeBitMapSummary(gd.bg_inode_bitmap);
+		InodeSummary(i);
 	}
 }

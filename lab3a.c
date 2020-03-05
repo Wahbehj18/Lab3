@@ -60,6 +60,11 @@ void bitMapSummary(int blockIndex){
 	}
 }
 
+void InodeSummary(int blockIndex)
+{
+
+}
+
 void InodeBitMapSummary(int index)
 {
   char IBitMap[blockSize];
