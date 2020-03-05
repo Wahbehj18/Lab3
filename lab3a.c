@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <math.h>
+#include <time.h>
+#include <sys/types.h>
 #include "ext2_fs.h"
 
 struct ext2_super_block super;
@@ -15,6 +17,14 @@ int blockSize;
 int numGroups;
 long bytesPerGroup;
 
+char* timeGetter(time_t curr)
+{
+  char* buff = malloc(sizeof(char)*32);
+  time_t rawtime = curr;
+  struct tm* raw = gmtime(&rawtime);
+  strftime(buff, 32, "%m/%d/%y %H:%M:%S", raw);
+  return buff;
+}
 
 void superSummary(){
 	pread(fd, &super, sizeof(super), blockSize);
@@ -60,8 +70,65 @@ void bitMapSummary(int blockIndex){
 	}
 }
 
-void InodeSummary(int blockIndex)
+void dirSummary(int inodeNum, struct ext2_inode *inode){
+
+	struct ext2_dir_entry dir;
+	int offset;
+	int logicalOffset = 0;
+	for(int i = 0; i < 12; i++){
+		if(inode->i_block[i] != 0){
+			while(logicalOffset < blockSize){
+				offset = inode->i_block[i]*blockSize + logicalOffset;
+				pread(fd, &dir, sizeof(dir), offset);
+				if(dir.inode != 0){
+					fprintf(stdout,"DIRENT,%d,%d,%d,%d,%d,'%s'\n",
+					inodeNum, logicalOffset, dir.inode, dir.rec_len, 
+					dir.name_len, dir.name);
+				}
+				logicalOffset += dir.rec_len;
+			}
+		}
+	}
+}
+
+void InodeSummary(int blockNum)
 {
+
+  int InodeTableSize = super.s_inodes_per_group;
+  int iNum = blockNum * InodeTableSize + 1;
+  struct ext2_inode inodeTable[super.s_inodes_per_group];
+  pread(fd, &inodeTable , sizeof(inodeTable) , blockSize * blockNum);
+  char fileType = '?';
+  int i = 0;
+  for(i = 0; i < InodeTableSize; i++)
+    {
+      if(inodeTable[i].i_mode != 0 && inodeTable[i].i_links_count != 0)
+		{
+		  if(inodeTable[i].i_mode & S_IFREG)
+		    fileType = 'f';
+		  else if(inodeTable[i].i_mode & S_IFDIR)
+		    fileType = 'd';
+		  else if(inodeTable[i].i_mode & S_IFLNK)
+		    fileType = 's';
+		  char* aTime;
+		  char* mTime;
+		  char* cTime;
+		  aTime = timeGetter( inodeTable[i].i_atime);
+		  mTime = timeGetter(inodeTable[i].i_mtime);
+		  cTime = timeGetter( inodeTable[i].i_ctime);
+		  
+		  fprintf(stdout, "INODE,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d",iNum + i,fileType, inodeTable[i].i_mode & 0xFFF, inodeTable[i].i_uid, inodeTable[i].i_gid, inodeTable[i].i_links_count, cTime, mTime, aTime, inodeTable[i].i_size, inodeTable[i].i_blocks);
+		  int j = 0;
+		  for (j = 0; j < 15; j++)
+		    {
+		      fprintf(stdout, ",%u", inodeTable[i].i_block[j]);
+		    }
+		  fprintf(stdout, "\n");
+
+		  if(fileType == 'd')
+    		dirSummary(iNum+i, &inodeTable[i]);
+		}
+    }
 
 }
 
@@ -87,26 +154,7 @@ void InodeBitMapSummary(int index)
     }
 }
 
-void dirSummary(int inodeNum, struct ext2_inode *inode){
 
-	struct ext2_dir_entry dir;
-	int offset;
-	int logicalOffset = 0;
-	for(int i = 0; i < 12; i++){
-		if(inode->i_block[i] != 0){
-			while(logicalOffset < blockSize){
-				offset = inode->i_block[i]*blockSize + logicalOffset;
-				pread(fd, &dir, sizeof(dir), offset);
-				if(dir.inode != 0){
-					fprintf(stdout,"DIRENT,%d,%d,%d,%d,%d,%s\n",
-					inodeNum, logicalOffset, dir.inode, dir.rec_len, 
-					dir.name_len, dir.name);
-				}
-				logicalOffset += dir.rec_len;
-			}
-		}
-	}
-}
 
 int main(int argc, char* argv[]){
 
@@ -121,9 +169,10 @@ int main(int argc, char* argv[]){
 	bytesPerGroup = super.s_blocks_count*super.s_blocks_per_group;
 	numGroups = (int)ceil((double)super.s_blocks_count/(double)super.s_blocks_per_group);
 	
-	for(int i; i < numGroups; i++){
+	for(int i = 0; i < numGroups; i++){
 		groupSummary(i);
 		bitMapSummary(gd.bg_block_bitmap);
 		InodeBitMapSummary(gd.bg_inode_bitmap);
+		InodeSummary(gd.bg_inode_table);
 	}
 }
